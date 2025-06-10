@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchHistory } from '../api';
 import { useNavigate } from 'react-router-dom';
-
+import { fetchTestSession } from '../api';
 export default function History() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,6 +13,8 @@ export default function History() {
       .then(res => setRecords(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+
+    fetchTestSession()
   }, []);
 
   return (

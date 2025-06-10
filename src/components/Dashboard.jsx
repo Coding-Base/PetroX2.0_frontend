@@ -5,7 +5,8 @@ import {
   startTest, 
   fetchLeaderboard,
   fetchUserHistory,
-  fetchUserRank
+  fetchUserRank,
+  fetchHistory
 } from '../api';
 import Chat from './chat';
 import { Line } from 'react-chartjs-2';
@@ -32,6 +33,34 @@ ChartJS.register(
   Legend
 );
 
+// PetroMark AI Widget Component
+const PetroMarkAI = () => {
+  useEffect(() => {
+    // Check if script is already loaded
+    const existingScript = document.querySelector('script[src="https://unpkg.com/@elevenlabs/convai-widget-embed"]');
+    
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+      script.async = true;
+      script.type = 'text/javascript';
+      document.head.appendChild(script);
+    }
+    
+    return () => {
+      // Clean up if needed
+    };
+  }, []);
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-hidden">
+        <elevenlabs-convai agent-id="agent_01jx3tjzhyfjnt6cxax880pxx4"></elevenlabs-convai>
+      </div>
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('');
@@ -42,12 +71,12 @@ export default function Dashboard() {
   const [testHistory, setTestHistory] = useState([]);
   const [userName, setUserName] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [userRank, setUserRank] = useState(null);  // Added for backend rank
+  const [userRank, setUserRank] = useState(null);
   const [isLoading, setIsLoading] = useState({
     leaderboard: true,
     history: true,
     courses: true,
-    rank: true  // Added loading state for rank
+    rank: true
   });
   const navigate = useNavigate();
 
@@ -76,7 +105,7 @@ export default function Dashboard() {
       });
     
     // Fetch user's test history
-    fetchUserHistory()
+    fetchHistory()
       .then(res => {
         setTestHistory(res.data);
         setIsLoading(prev => ({ ...prev, history: false }));
@@ -238,13 +267,28 @@ export default function Dashboard() {
             Create Group Test
           </button>
           
+          {/* New PetroMark AI Button */}
+          <button
+            className={`w-full text-left px-4 py-3 rounded-lg transition ${
+              activeTab === 'petromark' 
+                ? 'bg-blue-600' 
+                : 'hover:bg-blue-700'
+            }`}
+            onClick={() => setActiveTab('petromark')}
+          >
+            PetroMark AI
+          </button>
+          
           <button
             className={`w-full text-left px-4 py-3 rounded-lg transition ${
               activeTab === 'history' 
                 ? 'bg-blue-600' 
                 : 'hover:bg-blue-700'
             }`}
-            onClick={() => setActiveTab('history')}
+            onClick={() => {
+              setActiveTab('history');
+              navigate('/history');
+            }}
           >
             History
           </button>
@@ -369,7 +413,12 @@ export default function Dashboard() {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {leaderboard
-                          .sort((a, b) => (b.score / b.question_count) - (a.score / a.question_count))
+                          .slice() // Create a copy to avoid mutation
+                          .sort((a, b) => {
+                            const aScore = a.question_count > 0 ? (a.score / a.question_count) : 0;
+                            const bScore = b.question_count > 0 ? (b.score / b.question_count) : 0;
+                            return bScore - aScore;
+                          })
                           .map((user, index) => (
                             <tr key={user.id || index}>
                               <td className="px-4 py-3 text-sm">{index + 1}</td>
@@ -423,10 +472,10 @@ export default function Dashboard() {
                 </button>
                 
                 <button 
-                  onClick={() => setActiveTab('history')}
-                  className="bg-green-100 hover:bg-green-200 text-green-700 py-3 rounded-lg font-medium transition"
+                  onClick={() => setActiveTab('petromark')}
+                  className="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 py-3 rounded-lg font-medium transition"
                 >
-                  View History
+                  Talk to PetroMark
                 </button>
               </div>
             </div>
@@ -520,6 +569,27 @@ export default function Dashboard() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* PetroMark AI Tab */}
+        {activeTab === 'petromark' && (
+          <div className="bg-white rounded-xl shadow-md p-6 h-[calc(100vh-200px)]">
+            <div className="flex items-center mb-6">
+              <div className="bg-blue-100 p-3 rounded-full mr-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">PetroMark AI Assistant</h2>
+                <p className="text-gray-600">Your intelligent learning companion</p>
+              </div>
+            </div>
+            
+            <div className="border rounded-lg overflow-hidden h-[calc(100%-80px)]">
+              <PetroMarkAI />
+            </div>
           </div>
         )}
 
@@ -668,10 +738,12 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Chat Component */}
-        <div className="mt-10 max-w-4xl mx-auto">
-          <Chat />
-        </div>
+        {/* Chat Component - Only shown on dashboard */}
+        {activeTab === 'dashboard' && (
+          <div className="mt-10 max-w-4xl mx-auto">
+            <Chat />
+          </div>
+        )}
       </div>
     </div>
   );

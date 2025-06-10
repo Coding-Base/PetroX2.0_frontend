@@ -1,6 +1,7 @@
 // src/components/SignUp.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { registerUser } from '../api';
 import image from "./finallogo.png"
 
@@ -10,14 +11,15 @@ export default function SignUp() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
-
+  const [searchParams] = useSearchParams();
+ const next = searchParams.get('next') || '/signin'; // Default to sign-in if no next param
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
       await registerUser(username, email, password);
       // On success, redirect to sign-in or dashboard
-      navigate('/signin');
+      navigate(`/signin?next=${next}`);
     } catch (err) {
       // If our backend sent { detail: "..." }
       const msg = err.response?.data?.detail || 'Unexpected error. Please try again.';
@@ -77,6 +79,7 @@ export default function SignUp() {
 
           <button
             type="submit"
+            
             className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition"
           >
             Sign Up

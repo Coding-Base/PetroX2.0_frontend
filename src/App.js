@@ -7,24 +7,28 @@ import Test from './components/Test';
 import CreateGroupTest from './components/CreateGroupTest';
 import History from './components/History';
 import GroupTestPage from './components/GroupTestPage';
+import PrivateRoute from './Layouts/PrivateRoute';
+import LandingPage from './components/LandingPage';
 
 function App() {
-  const token = localStorage.getItem('access_token');
-  
+
   return (
     <Router>
       <Routes>
-        <Route path='/' element={token ? <Navigate to='/dashboard'/> : <Navigate to='/signin'/>} />
         <Route path='/signin' element={<SignIn />} />
         <Route path='/signup' element={<SignUp />} />
-        <Route path='/dashboard' element={token ? <Dashboard /> : <Navigate to='/signin' />} />
-        <Route path='/test/:sessionId' element={<Test />} />
-        <Route path='/create-group' element={<CreateGroupTest />} />
-        <Route path='/history' element={<History />} />
-       <Route
-          path="/group-test/:testId"
-          element={token ? <GroupTestPage /> : <Navigate to="/signin" />}
-        />
+        <Route path='/Home' element={<LandingPage />} />
+        <Route element={<PrivateRoute />}>
+          <Route path='/dashboard' element={ <Dashboard />} />
+          <Route path='/test/:sessionId' element={<Test />} />
+          <Route path='/create-group' element={<CreateGroupTest />} />
+          <Route path='/history' element={<History />} />
+          <Route
+            path="/group-test/:testId"
+            element={<GroupTestPage />}
+          />
+        </Route>
+
       </Routes>
     </Router>
   );

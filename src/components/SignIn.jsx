@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { loginUser } from '../api/index';
 import image from './finallogo.png';
+import { useSearchParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+
 
 export default function SignIn() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
-
+  const [searchParams] = useSearchParams();
+  const next = searchParams.get('next') || '/dashboard'; // Default to dashboard if no next param
+  const location = useLocation();
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -17,7 +22,8 @@ export default function SignIn() {
       localStorage.setItem('access_token', data.access);
       localStorage.setItem('refresh_token', data.refresh);
       localStorage.setItem('username', username);
-      navigate('/dashboard');
+
+      navigate(next)
     } catch (err) {
       console.error(err.response || err);
       // Extract detailed message if present
@@ -92,9 +98,10 @@ export default function SignIn() {
 
         <p className="mt-4 text-sm text-center text-gray-600">
           Don&apos;t have an account?{' '}
-          <Link to="/signup" className="text-blue-600 hover:underline">
+          <Link to={`/signup${location.search}`} className="text-blue-600 hover:underline">
             Sign Up
           </Link>
+          {/* {navigate(`/signin?next=${location.pathname}${location.search}`)} */}
         </p>
       </div>
     </div>
