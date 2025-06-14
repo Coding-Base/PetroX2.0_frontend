@@ -3,6 +3,7 @@ import random
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.db import IntegrityError
+from django.db import models
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.db.models import FloatField, F, ExpressionWrapper, Sum
@@ -26,9 +27,72 @@ from .serializers import (
     TestSessionSerializer,
     GroupTestSerializer
 )
+import os
+from django.conf import settings
+from rest_framework import generics
+from rest_framework.response import Response
+from rest_framework import status
 
+from rest_framework.parsers import MultiPartParser
+from google.cloud import storage
+from .models import Material
+from .serializers import MaterialSerializer
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Material
+from .serializers import MaterialSerializer
+from django.shortcuts import get_object_or_404
 
+class MaterialUploadView(generics.CreateAPIView):
+    serializer_class = MaterialSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def create(self, request, *args, **kwargs):
+        # Ensure the file is present
+        if 'file' not in request.FILES:
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create serializer with context that includes the user
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            # Save with the current user
+            material = serializer.save(uploaded_by=request.user)
+            
+            # Close the file handle explicitly
+            if hasattr(material.file, 'close'):
+                material.file.close()
+                
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class MaterialDownloadView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    queryset = Material.objects.all()
+    
+    def retrieve(self, request, *args, **kwargs):
+        material = self.get_object()
+        return Response({
+            'download_url': material.file_url
+        })
+
+class MaterialSearchView(generics.ListAPIView):
+    serializer_class = MaterialSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        query = self.request.query_params.get('query', '')
+        if not query:
+            return Material.objects.none()
+        
+        return Material.objects.filter(
+            models.Q(name__icontains=query) | 
+            models.Q(tags__icontains=query) |
+            models.Q(course__name__icontains=query)
+        )
 
 # List all courses (authenticated)
 class CourseListAPIView(generics.ListAPIView):

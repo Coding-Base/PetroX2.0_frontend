@@ -1,5 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
+# from .storage_backends import GoogleCloudMediaStorage
+from django.conf import settings
+
+
+
 
 class Course(models.Model):
     name = models.CharField(max_length=255)
@@ -49,3 +54,20 @@ class GroupTest(models.Model):
     scheduled_start = models.DateTimeField()
     def __str__(self):
         return self.name
+from .storage_backends import GoogleCloudMediaStorage
+from django.conf import settings
+
+class Material(models.Model):
+    course = models.ForeignKey('Course', on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    tags = models.CharField(max_length=255, blank=True)
+    file = models.FileField(
+        upload_to='materials/',
+        storage=GoogleCloudMediaStorage()
+    )
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def file_url(self):
+        return self.file.url if self.file else ''

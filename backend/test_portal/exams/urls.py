@@ -14,11 +14,15 @@ from .views import (
     user_rank,
     GroupTestDetailAPIView
 )
+from .views import MaterialUploadView, MaterialSearchView,Material,MaterialDownloadView
 
 urlpatterns = [
     # Registration under /api/users/
     path('users/', RegisterUserAPIView.as_view(), name='register-user'),
-
+    # Material upload
+    path('materials/upload/', MaterialUploadView.as_view(), name='material-upload'),
+    path('materials/download/<int:pk>/', MaterialDownloadView.as_view(), name='material-download'),
+    path('materials/search/', MaterialSearchView.as_view(), name='material-search'),
     # Course listing
     path('courses/', CourseListAPIView.as_view(), name='course-list'),
 

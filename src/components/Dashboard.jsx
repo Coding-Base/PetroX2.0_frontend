@@ -6,7 +6,7 @@ import {
   fetchLeaderboard,
   fetchUserHistory,
   fetchUserRank,
-  fetchHistory
+  // fetchHistory
 } from '../api';
 import Chat from './chat';
 import { Line } from 'react-chartjs-2';
@@ -105,7 +105,7 @@ export default function Dashboard() {
       });
     
     // Fetch user's test history
-    fetchHistory()
+    fetchUserHistory()
       .then(res => {
         setTestHistory(res.data);
         setIsLoading(prev => ({ ...prev, history: false }));
@@ -185,7 +185,9 @@ export default function Dashboard() {
         {
           label: 'Your Performance',
           data: sortedHistory.map(session => 
-            Math.round((session.score / session.questions.count) * 100)
+            session.questions && session.questions.count > 0
+              ? Math.round((session.score / session.questions.count) * 100)
+              : 0
           ),
           borderColor: 'rgba(75, 192, 192, 1)',
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -198,20 +200,27 @@ export default function Dashboard() {
   // Calculate stats from real data
   const calculateStats = () => {
     const testsTaken = testHistory.length;
-    const totalScore = testHistory.reduce((sum, session) => {
-      return sum + (session.score / session.questions.count);
-    }, 0);
-    const averageScore = testsTaken > 0 
-      ? Math.round((totalScore / testsTaken) * 100) 
+    let totalScore = 0;
+    let scoredTests = 0;
+
+    testHistory.forEach(session => {
+      const questionCount = session.questions?.count || 0;
+      if (questionCount > 0) {
+        totalScore += (session.score / questionCount);
+        scoredTests++;
+      }
+    });
+
+    const averageScore = scoredTests > 0
+      ? Math.round((totalScore / scoredTests) * 100)
       : 0;
-    
+
     return {
       testsTaken,
       averageScore,
-      currentRank: userRank
+      currentRank: userRank,
     };
   };
-
   const stats = calculateStats();
   const chartData = getChartData();
 
@@ -266,7 +275,21 @@ export default function Dashboard() {
           >
             Create Group Test
           </button>
-          
+          {/* Material Management button */}
+           
+          <button
+            className={`w-full text-left px-4 py-3 rounded-lg transition ${
+              activeTab === 'MaterialManagement' 
+                ? 'bg-blue-600' 
+                : 'hover:bg-blue-700'
+            }`}
+            onClick={() => {
+              setActiveTab('MaterialManagement');
+              navigate('/material');
+            }}
+          >
+            Material Management
+          </button>
           {/* New PetroMark AI Button */}
           <button
             className={`w-full text-left px-4 py-3 rounded-lg transition ${
@@ -287,7 +310,7 @@ export default function Dashboard() {
             }`}
             onClick={() => {
               setActiveTab('history');
-              navigate('/history');
+            
             }}
           >
             History
@@ -621,8 +644,10 @@ export default function Dashboard() {
                       const start = new Date(session.start_time);
                       const end = new Date(session.end_time);
                       const duration = Math.round((end - start) / 60000); // in minutes
-                      const scorePercentage = Math.round((session.score / session.questions.count) * 100);
-                      
+                      const scorePercentage = (session.questions && session.questions.count > 0)
+                        ? Math.round((session.score / session.questions.count) * 100)
+                        : 0;
+
                       return (
                         <tr key={session.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -636,7 +661,7 @@ export default function Dashboard() {
                               {scorePercentage}%
                             </span>
                             <span className="text-gray-500 text-xs block">
-                              ({session.score}/{session.questions.count})
+                              ({session.score}/{session.questions?.count || 0})
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

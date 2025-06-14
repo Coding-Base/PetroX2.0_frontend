@@ -2,8 +2,26 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
+import os
 
-# Load .env
+GS_BUCKET_NAME =  'petrox-materials'
+GS_PROJECT_ID = 'radiant-mason-462816-q3'
+# 
+# GCS_CREDENTIALS_PATH = 
+
+GCS_CREDENTIALS_PATH = r'C:\Users\USER\Downloads\ninth-bonfire-399111-b8962690bc0b.json'
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GCS_CREDENTIALS_PATH
+GOOGLE_APPLICATION_CREDENTIALS = GCS_CREDENTIALS_PATH
+
+DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/'
+
+GS_DEFAULT_ACL = None
+# GOOGLE_APPLICATION_CREDENTIALS = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+# GS_BUCKET_NAME = os.environ.get('petrox-materials')
+# DEFAULT_FILE_STORAGE = 'db.sqlite3.GoogleCloudMediaStorage'
+# MEDIA_URL = f'https://storage.googleapis.com/{GS_BUCKET_NAME}/media/'
+# # Load .env
 load_dotenv()
 
 # Paths
@@ -26,9 +44,17 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'channels',
+    'storages',
     'exams',
 ]
+# Google Cloud Storage
+# DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+# GS_BUCKET_NAME = os.getenv('GS_BUCKET_NAME')
 
+# GS_PROJECT_ID = os.getenv('GS_PROJECT_ID')  # Replace with your GCP project ID
+
+# Path to your service account key file
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, 'path/to/service-account.json')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -100,6 +126,26 @@ REST_FRAMEWORK = {
 # CORS
 #
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 #
 # Static files
@@ -154,4 +200,9 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+}
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
 }

@@ -5,10 +5,11 @@ import SignUp from './components/SignUp';
 import Dashboard from './components/Dashboard'; // Ensure this is correct
 import Test from './components/Test';
 import CreateGroupTest from './components/CreateGroupTest';
-import History from './components/History';
+// import History from './components/History';
 import GroupTestPage from './components/GroupTestPage';
 import PrivateRoute from './Layouts/PrivateRoute';
 import LandingPage from './components/LandingPage';
+import MaterialsManagement from './components/MaterialsManagement';
 
 function App() {
 
@@ -18,11 +19,14 @@ function App() {
         <Route path='/signin' element={<SignIn />} />
         <Route path='/signup' element={<SignUp />} />
         <Route path='/Home' element={<LandingPage />} />
+        
         <Route element={<PrivateRoute />}>
+          {/* <Route path='/history' element={<History />} /> */}
+           <Route path='/material' element={<MaterialsManagement />} />
           <Route path='/dashboard' element={ <Dashboard />} />
           <Route path='/test/:sessionId' element={<Test />} />
           <Route path='/create-group' element={<CreateGroupTest />} />
-          <Route path='/history' element={<History />} />
+          
           <Route
             path="/group-test/:testId"
             element={<GroupTestPage />}
