@@ -14,7 +14,10 @@ from .views import (
     user_rank,
     GroupTestDetailAPIView
 )
-from .views import MaterialUploadView, MaterialSearchView,Material,MaterialDownloadView
+from .views import MaterialUploadView, MaterialSearchView,Material,MaterialDownloadView,UploadPassQuestionsView,QuestionApprovalView
+from . import views
+
+
 
 urlpatterns = [
     # Registration under /api/users/
@@ -40,6 +43,10 @@ urlpatterns = [
     path('group-test/<int:pk>/', GroupTestDetailAPIView.as_view(), name='group-test-detail'),
     path('leaderboard/', LeaderboardAPIView.as_view(), name='leaderboard'),
     path('user/rank/', user_rank, name='user-rank'),
+    path('upload-pass-questions/', UploadPassQuestionsView.as_view(), name='upload-pass-questions'),
+    path('questions/pending/', QuestionApprovalView.as_view(), name='pending-questions'),
+    path('questions/<int:question_id>/status/', QuestionApprovalView.as_view(), name='update-question-status'),
+    path('user/upload-stats/', views.user_upload_stats, name='user-upload-stats'),
    
 ]
 

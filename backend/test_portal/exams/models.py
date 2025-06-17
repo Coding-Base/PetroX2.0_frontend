@@ -9,7 +9,8 @@ from django.conf import settings
 class Course(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    
+    status = models.CharField(max_length=20, default='approved')  # Add this line
+
     def __str__(self):
         return self.name
 
@@ -26,6 +27,25 @@ class Question(models.Model):
         ('C', 'C'),
         ('D', 'D'),
     ])
+    source_file = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending Approval'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected')
+        ],
+        default='pending'
+    )
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    def __str__(self):
+        return self.question_text[:50]
     
     def __str__(self):
         return self.question_text[:50]

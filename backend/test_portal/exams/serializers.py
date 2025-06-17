@@ -66,3 +66,20 @@ class QuestionSerializer(serializers.ModelSerializer):
 class TestSessionSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True)
     class Meta: model = TestSession; fields = ['id','user','course','questions','start_time','end_time','score','duration','question_count']
+
+
+class BulkQuestionSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    course_id = serializers.IntegerField()
+    question_type = serializers.ChoiceField(choices=[('multichoice', 'Multiple Choice')])
+    
+    def validate_course_id(self, value):
+        if not Course.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Invalid course ID")
+        return value
+
+class QuestionStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Question
+        fields = ['id', 'status', 'question_text']
+        read_only_fields = ['id', 'question_text']

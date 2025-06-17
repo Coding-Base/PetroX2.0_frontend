@@ -1,5 +1,9 @@
 import random
-
+import re
+import PyPDF2
+from docx import Document
+from io import BytesIO
+from rest_framework.permissions import IsAdminUser
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.db import IntegrityError
@@ -10,7 +14,7 @@ from django.db.models import FloatField, F, ExpressionWrapper, Sum
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, ParseError
 from django.db.models import Q
 from django.core.mail import send_mail
 from django.conf import settings
@@ -25,14 +29,9 @@ from .serializers import (
     CourseSerializer,
     QuestionSerializer,
     TestSessionSerializer,
-    GroupTestSerializer
+    GroupTestSerializer,
+    BulkQuestionSerializer,
 )
-import os
-from django.conf import settings
-from rest_framework import generics
-from rest_framework.response import Response
-from rest_framework import status
-
 from rest_framework.parsers import MultiPartParser
 from google.cloud import storage
 from .models import Material
@@ -368,13 +367,13 @@ class LeaderboardAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        # Get top sessions with calculated score percentage
+        # Get top sessions with proper score calculation
         sessions = TestSession.objects.annotate(
             score_percentage=ExpressionWrapper(
                 F('score') * 100.0 / F('question_count'),
                 output_field=FloatField()
             )
-        ).order_by('-score_percentage')[:10]
+        ).filter(question_count__gt=0).order_by('-score_percentage')[:10]
 
         # Serialize data
         data = [{
@@ -387,6 +386,8 @@ class LeaderboardAPIView(APIView):
         } for session in sessions]
 
         return Response(data)
+
+
 
 # Fixed User Rank View
 @api_view(['GET'])
@@ -419,3 +420,204 @@ def user_rank(request):
         rank = None
 
     return Response({'rank': rank})
+
+class QuestionApprovalView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        """List all pending questions."""
+        pending_questions = Question.objects.filter(status='pending')
+        data = [
+            {
+                "id": q.id,
+                "course": q.course.name,
+                "question_text": q.question_text,
+                "status": q.status,
+            }
+            for q in pending_questions
+        ]
+        return Response(data)
+
+    def patch(self, request, question_id):
+        """Approve or reject a question."""
+        try:
+            question = Question.objects.get(id=question_id)
+        except Question.DoesNotExist:
+            return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get("status")
+        if new_status not in ["approved", "rejected"]:
+            return Response({"detail": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+
+        question.status = new_status
+        question.save()
+        return Response({"detail": f"Question {question_id} status updated to {new_status}."})
+
+class UploadPassQuestionsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        serializer = BulkQuestionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        file = serializer.validated_data['file']
+        course_id = serializer.validated_data['course_id']
+        question_type = serializer.validated_data['question_type']
+        course = get_object_or_404(Course, id=course_id)
+        
+        # Extract text from file
+        text = self.extract_text(file)
+        
+        # Parse questions based on type
+        if question_type == 'multichoice':
+            questions = self.parse_multichoice_questions(text)
+        else:
+            return Response(
+                {"error": "Only multiple choice questions are currently supported"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Save questions to database
+        created_count = 0
+        for q in questions:
+            Question.objects.create(
+                course=course,
+                question_text=q['text'],
+                option_a=q['A'],
+                option_b=q['B'],
+                option_c=q['C'],
+                option_d=q['D'],
+                correct_option=q['answer'],
+                source_file=file.name,
+                status='pending',
+                uploaded_by=request.user
+            )
+            created_count += 1
+            
+        # Notify admins
+        self.notify_admins(request.user, course, created_count)
+            
+        return Response({
+            "message": f"{created_count} questions uploaded for review",
+            "course": course.name,
+            "filename": file.name
+        }, status=status.HTTP_201_CREATED)
+
+    def extract_text(self, file):
+        filename = file.name.lower()
+        file_content = file.read()
+        
+        # Reset file pointer for DOCX processing
+        file.seek(0)
+        
+        if filename.endswith('.pdf'):
+            try:
+                reader = PyPDF2.PdfReader(BytesIO(file_content))
+                return "\n".join([page.extract_text() for page in reader.pages])
+            except Exception as e:
+                raise ParseError(f"PDF processing error: {str(e)}")
+                
+        elif filename.endswith('.docx'):
+            try:
+                doc = Document(BytesIO(file_content))
+                return "\n".join([para.text for para in doc.paragraphs])
+            except Exception as e:
+                raise ParseError(f"DOCX processing error: {str(e)}")
+                
+        elif filename.endswith('.txt'):
+            try:
+                return file_content.decode('utf-8')
+            except Exception as e:
+                raise ParseError(f"Text file processing error: {str(e)}")
+                
+        else:
+            raise ParseError("Unsupported file format. Use PDF, DOCX, or TXT")
+
+    def parse_multichoice_questions(self, text):
+        # Improved regex pattern for multi-line, multi-choice questions
+        pattern = r"""
+            (\d+[\.\)]?)\s*                # Question number (e.g., 1. or 1)
+            (.*?)\s*                       # Question text (non-greedy)
+            a[\.\)]?\s*(.*?)\s*            # Option A
+            b[\.\)]?\s*(.*?)\s*            # Option B
+            c[\.\)]?\s*(.*?)\s*            # Option C
+            d[\.\)]?\s*(.*?)\s*            # Option D
+            (?:answer|ans|correct|corr)    # Answer label
+            [:\s]+([a-dA-D])               # The answer letter
+        """
+        matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE | re.VERBOSE)
+
+        questions = []
+        for match in matches:
+            try:
+                questions.append({
+                    'text': match[1].strip(),
+                    'A': match[2].strip(),
+                    'B': match[3].strip(),
+                    'C': match[4].strip(),
+                    'D': match[5].strip(),
+                    'answer': match[6].upper()
+                })
+            except IndexError:
+                continue
+
+        if not questions:
+            raise ParseError("No valid questions found in the document")
+
+        return questions
+
+    def notify_admins(self, user, course, count):
+        admin_emails = User.objects.filter(
+            is_staff=True
+        ).values_list('email', flat=True)
+        
+        if admin_emails and count > 0:
+            subject = f"New Questions Pending Approval for {course.name}"
+            message = f"User {user.username} uploaded {count} questions for course: {course.name}. Please review them in the admin panel."
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.EMAIL_HOST_USER,
+                    admin_emails,
+                    fail_silently=True
+                )
+            except Exception as e:
+                print(f"Failed to send email notification: {str(e)}")
+
+
+    
+    def patch(self, request, question_id):
+        question = get_object_or_404(Question, id=question_id)
+        new_status = request.data.get('status')
+        
+        if new_status not in ['approved', 'rejected']:
+            return Response(
+                {"error": "Invalid status. Use 'approved' or 'rejected'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        question.status = new_status
+        question.save()
+        
+        return Response({
+            "id": question.id,
+            "status": question.status,
+            "message": f"Question status updated to {new_status}"
+        })
+    
+
+# views.py
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_upload_stats(request):
+    approved_count = Question.objects.filter(
+        uploaded_by=request.user,
+        status='approved'
+    ).count()
+    
+    return Response({
+        'approved_uploads': approved_count
+    })

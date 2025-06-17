@@ -85,5 +85,14 @@ export const fetchLeaderboard = () => api.get('leaderboard/');
 export const fetchUserHistory = () => api.get('history/');
 export const fetchUserRank = () => api.get('user/rank/');
 
+//fetch user upload stats
+
+export const fetchUserUploadStats = () => {
+  return axios.get('/api/user/upload-stats/', {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('access_token')}`
+    }
+  });
+};
 
 export default api;
